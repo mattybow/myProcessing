@@ -24,7 +24,7 @@ void draw() {
 
 void branch(int depth) {
   if (depth<8) {
-    int col = map(depth,0,8,255,0);
+    int col = (int)map(depth,0,8,255,0);
     if (depth<4)
     {
       stroke(col);
