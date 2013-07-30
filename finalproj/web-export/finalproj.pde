@@ -1,11 +1,29 @@
 //GLOBALS
+import ddf.minim.*;
+import ddf.minim.analysis.*;
+//import peasy.*;
+//PeasyCam cam;
+
+Minim minim;
+AudioPlayer player;
+BeatDetect beat;
+BeatListener b1;
+
 Grid myGrid;
 int settle = 1;
 int SQ = 25;
+float t = 0.0;
 void setup(){
   size(600,500,P3D);
   colorMode(HSB);
+  minim = new Minim(this);
   myGrid = new Grid();                                //sends bar array to Grid class
+  player = minim.loadFile("YaHey.mp3", 2048);
+  player.play();
+  beat = new BeatDetect(player.bufferSize(),player.sampleRate());
+  beat.setSensitivity(10);
+  b1 = new BeatListener(beat,player);
+  //cam = new PeasyCam(this,600);
 }
 
 void draw(){
@@ -19,27 +37,80 @@ void draw(){
 //  float cameraZ = cameraY / tan(fov / 2.0);
 //  float aspect = float(width)/float(height);
 //  perspective(fov, aspect, cameraZ/2000.0, cameraZ*4000.0);
+  float powL = 0;
+  float powR = 0;
+  if(t<=0.0){
+    for(int i=200;i<player.bufferSize();i++){
+      powL = player.left.get(i);
+      powR = player.right.get(i);
+      if (abs(powL)>.5){
+        int p=(int)(powL*6);
+        myGrid.addBar(p,0,(int)random(0,SQ-1));
+        myGrid.addBar(p,0,(int)random(0,SQ-1));
+        t=.10;
+      }
+      if (abs(powL)>.7){
+        myGrid.addBar(7,2,(int)random(0,SQ-1));
+        myGrid.addBar(7,3,(int)random(0,SQ-1));
+      }
+      if (abs(powL)>.75){
+        myGrid.addBar(5,7,(int)random(0,SQ-1));
+      }
+      if (abs(powR)>.5){
+        myGrid.addBar(5,4,(int)random(0,SQ-1));
+        myGrid.addBar(5,4,(int)random(0,SQ-1));
+      }
+      if (abs(powR)>.7){
+        myGrid.addBar(7,5,(int)random(0,SQ-1));
+        myGrid.addBar(7,6,(int)random(0,SQ-1));
+      }
+      if (abs(powR)>.75){
+        myGrid.addBar(5,8,(int)random(0,SQ-1));
+      }
+      if(beat.isHat()){
+        myGrid.addBar(5,7,(int)random(0,SQ-1));
+      }
+      break;
+    }
+    t -= .01;
+  }
+  else t -= .01;
+    //println(player.bufferSize());
+//    for(int i=0;i<player.bufferSize();i++){
+//      println(i + " = " + player.left.get(i));
+//    }
+//    println("---------");
+//    println(player.left.get(
+  if(beat.isSnare()) {
+    myGrid.addBar(5,1,(int)random(0,SQ-1));
+  }
+  
   pushMatrix(); 
   translate(0, height/2, 0);                        //rotates ENTIRE grid and translates
+  //translate(-width/2, 0, 200);                    //use with peasycam
   rotateX(PI/2.4);
-  //rotateZ(-.1);
+//  rotateZ(-.8);
   myGrid.display();
   popMatrix();
 }
+void stop()
+{
+  player.close();
+  minim.stop();
+  super.stop();
+}
 
 void mousePressed(){
-  if(settle==0){
-    settle=1;
-  }
-  myGrid.addBar(5,(float)mouseX,(float)mouseY);
+//  myGrid.addBar(5,(float)mouseX,(float)mouseY);
 }
 
 public class Bar{
-  int s,h,z,c,posX,posY,posZ,row,col;
+  int s,h,z,c,posX,posY,posZ,row,col,max_h;
   float alpha;
   //BAR CONSTRUCTOR
   Bar(int vert_height, int xCoord, int yCoord, int zCoord, int i_row, int i_col){
     h = vert_height;
+    max_h = vert_height;
     posX = xCoord;
     posY = yCoord;
     posZ = zCoord;
@@ -62,10 +133,11 @@ public class Bar{
   int getZ(){return posZ;}
   int getC(){return c;}
   int getH(){return h;}
+  int getMH(){return max_h;}
   int get_row(){return row;}
   int get_col(){return col;}
   void display(){
-    alpha = map(posZ,-100,0,0,210);
+    alpha = map(posZ,-60,0,0,210);
     fill(c,200,255,(int)alpha);
     noStroke();
     box(s,s,h);
@@ -77,12 +149,35 @@ public class Bar{
     return done;
   }
 }
+class BeatListener implements AudioListener
+{
+  private BeatDetect beat;
+  private AudioPlayer source;
+ 
+  BeatListener(BeatDetect beat, AudioPlayer source)
+  {
+    this.source = source;
+    this.source.addListener(this);
+    this.beat = beat;
+  }
+ 
+  void samples(float[] samps)
+  {
+    beat.detect(source.mix);
+  }
+ 
+  void samples(float[] sampsL, float[] sampsR)
+  {
+    beat.detect(source.mix);
+  }
+}
 public class Cloud {
-  int c, alpha;
+  int c, alpha, age;
   PVector pos;
   Particle[] pArr;
   Cloud(int num_particles, int i_color, int x, int y, int z){
     c = i_color;
+    age = 200;
     pos = new PVector(x,y,z);
     pArr = new Particle[num_particles];
     for(int i=0;i<num_particles;i++){
@@ -90,10 +185,18 @@ public class Cloud {
     }
   }
   void display(){
-    translate(pos.x,pos.y,pos.z);
-    for(int j=0;j<pArr.length;j++){
-      pArr[j].display();
+    pushMatrix();
+    {
+      translate(pos.x,pos.y,pos.z);
+      for(int j=0;j<pArr.length;j++){
+        pArr[j].display();
+      }
     }
+    popMatrix();
+    age-=1;
+  }
+  int getAge(){
+    return age;
   }
   boolean pop(){
     boolean remove=false;
@@ -141,7 +244,11 @@ public class Grid{
         }
     }
     for(int k=0;k<c_grid.size();k++){
-      c_grid.get(k).display();
+      Cloud i_cloud = c_grid.get(k);
+      i_cloud.display();
+      if (i_cloud.getAge()<=0){
+        c_grid.remove(i_cloud);
+      }
     }
   }
   int settle(){    //puts all bars back to zero plane
@@ -154,12 +261,14 @@ public class Grid{
       complete += zVal;
       if(zVal==0){
        s_grid[iBar.get_col()][iBar.get_row()].setMode();
-       c_grid.add(new Cloud(50,iBar.getC(),xVal,yVal,zVal));
+       if (iBar.getH()==iBar.getMH()){
+         c_grid.add(new Cloud(20,iBar.getC(),xVal,yVal,zVal));
+       }
        if(iBar.dissolve()){
          grid1.remove(iBar);
        }
       } 
-      else iBar.moveZ(1);
+      else iBar.moveZ(2);
     }
     return complete;
   }
@@ -169,15 +278,13 @@ public class Grid{
     }
   }
   
-  void addBar(int power, float i_x, float i_y){
+  void addBar(int power, int row, int col){
     //power=>height
 //    int col=(int)((i_x /width)*GRID_X); 
 //    int row=(int)((i_y-height/2) / (height/2) * GRID_Y);
-    int col = 11;
-    int row = 4;
     int x_conv = SQ*col+5*col;
     int y_conv = SQ*row+5*row;
-    grid1.add(new Bar(power,x_conv,y_conv,-100,row,col));
+    grid1.add(new Bar(power,x_conv,y_conv,-60,row,col));
   }
 }
 public class Particle{
@@ -240,7 +347,7 @@ public class Square{
     mode = true;
   }
   void display(){
-    if(!mode) stroke(255,20);
+    if(!mode) stroke(255,30);
     else {
       if(timer>0){
         int alpha=(int)map(timer,0,100,0,255);

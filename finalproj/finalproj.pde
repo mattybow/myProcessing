@@ -1,9 +1,11 @@
 //GLOBALS
 import ddf.minim.*;
 import ddf.minim.analysis.*;
+//import peasy.*;
+//PeasyCam cam;
 
 Minim minim;
-AudioPlayer player;
+AudioPlayer player;  
 BeatDetect beat;
 BeatListener b1;
 
@@ -21,6 +23,7 @@ void setup(){
   beat = new BeatDetect(player.bufferSize(),player.sampleRate());
   beat.setSensitivity(10);
   b1 = new BeatListener(beat,player);
+  //cam = new PeasyCam(this,600);
 }
 
 void draw(){
@@ -84,6 +87,7 @@ void draw(){
   
   pushMatrix(); 
   translate(0, height/2, 0);                        //rotates ENTIRE grid and translates
+  //translate(-width/2, 0, 200);                    //use with peasycam
   rotateX(PI/2.4);
 //  rotateZ(-.8);
   myGrid.display();
